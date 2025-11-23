@@ -19,7 +19,7 @@ func BenchmarkSum8(b *testing.B) {
 	var local int64
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		s := make([]int64, 1_000_000)
+		s := make([]int64, 4_000_000)
 		b.StartTimer()
 		local = sum8(s)
 	}
