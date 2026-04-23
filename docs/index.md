@@ -1986,7 +1986,116 @@ fmt.Println(v)
 
     You can send repeated notifications to multiple goroutines with `sync.Cond`.
 
- [:simple-github: Source code](https://github.com/teivah/100-go-mistakes/tree/master/src/09-concurrency-practice/72-cond/main.go)
+In the following examples, the donation amount increases over time, and multiple listener goroutines should be notified when their target goal is reached. The book shows three different implementations, demonstrating common mistakes and the correct use of sync.Cond.
+
+#### Polling with a mutex
+This implementation continuously locks and unlocks the mutex inside a loop, waiting for balance to reach the desired goal.
+```go
+type Donation struct {
+    mu      sync.RWMutex
+    balance int
+}
+donation := &Donation{}
+
+// Listener goroutines
+f := func(goal int) {
+    donation.mu.RLock()
+    for donation.balance < goal {
+        donation.mu.RUnlock()
+        donation.mu.RLock()
+    }
+    fmt.Printf("$%d goal reached\n", donation.balance)
+    donation.mu.RUnlock()
+}
+go f(10)
+go f(15)
+
+// Updater goroutine
+go func() {
+    for {
+        time.Sleep(time.Second)
+        donation.mu.Lock()
+        donation.balance++
+        donation.mu.Unlock()
+    }
+}()
+```
+Two major problems occur:
+* The goroutines spin endlessly, checking the condition again and again.
+  This is a classic busy wait and wastes CPU cycles.
+* The code creates unnecessary lock contention between readers and the updater goroutine.
+
+#### Misusing a channel for broadcasting
+This approach uses a channel to notify listeners.
+```go
+type Donation struct {
+    balance int
+    ch      chan int
+}
+
+donation := &Donation{ch: make(chan int)}
+
+// Listener goroutines
+f := func(goal int) {
+    for balance := range donation.ch {
+        if balance >= goal {
+            fmt.Printf("$%d goal reached\n", balance)
+            return
+        }
+    }
+}
+go f(10)
+go f(15)
+
+// Updater goroutine
+for {
+    time.Sleep(time.Second)
+    donation.balance++
+    donation.ch <- donation.balance
+}
+````
+However, channels do not broadcast values: each value sent on a channel is consumed by exactly one goroutine.
+
+#### Correct implementation using sync.Cond
+```go
+type Donation struct {
+    cond    *sync.Cond
+    balance int
+}
+
+donation := &Donation{
+    cond: sync.NewCond(&sync.Mutex{}),
+}
+
+// Listener goroutines
+f := func(goal int) {
+    donation.cond.L.Lock()
+    for donation.balance < goal {
+        donation.cond.Wait()
+    }
+    fmt.Printf("%d$ goal reached\n", donation.balance)
+    donation.cond.L.Unlock()
+}
+go f(10)
+go f(15)
+
+// Updater goroutine
+for {
+    time.Sleep(time.Second)
+    donation.cond.L.Lock()
+    donation.balance++
+    donation.cond.L.Unlock()
+    donation.cond.Broadcast()
+}
+```
+sync.Cond solves the problems from the previous listings:
+
+* Wait() blocks efficiently, without polling or consuming CPU.
+* When the shared state (balance) changes, Broadcast() wakes up all waiting goroutines.
+* The condition check is wrapped in a for loop to handle spurious wakeups and ensure correctness.
+
+This is the idiomatic pattern when several goroutines need to wait on the same condition.
+[:simple-github: Source code](https://github.com/teivah/100-go-mistakes/tree/master/src/09-concurrency-practice/72-cond/main.go)
 
 ### Not using `errgroup` (#73)
 
