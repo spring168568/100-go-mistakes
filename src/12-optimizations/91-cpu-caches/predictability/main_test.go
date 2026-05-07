@@ -24,7 +24,7 @@ func BenchmarkSum2(b *testing.B) {
 	var local int64
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		s := make([]int64, n)
+		s := make([]int64, n*2)
 		b.StartTimer()
 		local = sum2(s)
 	}
