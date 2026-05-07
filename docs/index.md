@@ -542,7 +542,7 @@ It’s essential to understand how to use `==` and `!=` to make comparisons effe
 
 ???+ note
 
-    We can also use the `?`, `>=`, `<`, and `>` operators with numeric types to compare values and with strings to compare their lexical order.
+    We can also use the `<=`, `>=`, `<`, and `>` operators with numeric types to compare values and with strings to compare their lexical order.
 
 If operands are not comparable (e.g., slices and maps), we have to use other options such as reflection. Reflection is a form of metaprogramming, and it refers to the ability of an application to introspect and modify its structure and behavior. For example, in Go, we can use `reflect.DeepEqual`. This function reports whether two elements are deeply equal by recursively traversing two values. The elements it accepts are basic types plus arrays, structs, slices, maps, pointers, interfaces, and functions. Yet, the main catch is the performance penalty.
 
